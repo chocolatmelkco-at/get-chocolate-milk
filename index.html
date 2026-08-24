@@ -5,243 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Get Chocolate Milk</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #1e1e1e;
-            color: #ffffff;
+            margin: 0; padding: 0;
+            background-color: #1e1e1e; color: #ffffff;
             font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow-x: hidden;
-            touch-action: manipulation;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow-x: hidden; touch-action: manipulation;
         }
-        
-        /* Rotation Prompt for Portrait Mode */
         #rotate-prompt {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 9999;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 20px;
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.9); z-index: 9999; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center; padding: 20px;
         }
-        #rotate-prompt div {
-            font-size: 18px;
-            color: #f1c40f;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        #main-wrapper {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-            max-width: 100vw;
-            justify-content: center;
-            padding: 10px;
-        }
-
-        /* Scalable Game Viewport Container */
-        #game-stage {
-            width: min(100vw - 20px, 800px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
+        #rotate-prompt div { font-size: 18px; color: #f1c40f; font-weight: bold; margin-top: 10px; }
+        #main-wrapper { display: flex; gap: 20px; align-items: flex-start; max-width: 100vw; justify-content: center; padding: 10px; }
+        #game-stage { width: min(100vw - 20px, 800px); display: flex; flex-direction: column; align-items: center; }
         #game-container {
-            position: relative;
-            width: 100%;
-            /* Maintains 16:10 aspect ratio (800x500) automatically */
-            aspect-ratio: 800 / 500;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-            border: 4px solid #555555;
-            border-radius: 4px;
-            overflow: hidden;
-            background-color: #2b2b2b;
+            position: relative; width: 100%; aspect-ratio: 800 / 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7); border: 4px solid #555555;
+            border-radius: 4px; overflow: hidden; background-color: #2b2b2b;
         }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-        }
-
+        canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
         #ui {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-            font-weight: bold;
-            text-shadow: 2px 2px 0px #000;
-            pointer-events: none;
-            z-index: 10;
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between; font-size: 14px;
+            font-weight: bold; text-shadow: 2px 2px 0px #000; pointer-events: none; z-index: 10;
         }
-        .stats-bar {
-            display: flex;
-            gap: 15px;
-        }
-
-        /* Responsive Sidebar */
+        .stats-bar { display: flex; gap: 15px; }
         #sidebar {
-            width: 260px;
-            height: 500px;
-            background-color: #2b2b2b;
-            border: 4px solid #555555;
-            border-radius: 4px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            width: 260px; height: 500px; background-color: #2b2b2b;
+            border: 4px solid #555555; border-radius: 4px; padding: 15px;
+            display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
         }
-        h2, h3 {
-            margin: 0;
-            text-align: center;
-            color: #f1c40f;
-            text-transform: uppercase;
-            font-size: 16px;
-            letter-spacing: 1px;
-        }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        label {
-            font-size: 12px;
-            color: #aaaaaa;
-        }
+        h2, h3 { margin: 0; text-align: center; color: #f1c40f; text-transform: uppercase; font-size: 16px; letter-spacing: 1px; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; color: #aaaaaa; }
         input[type="text"] {
-            background-color: #1e1e1e;
-            border: 2px solid #555555;
-            color: #ffffff;
-            padding: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            border-radius: 2px;
-            outline: none;
+            background-color: #1e1e1e; border: 2px solid #555555; color: #ffffff;
+            padding: 8px; font-family: inherit; font-size: 14px; border-radius: 2px; outline: none;
         }
-        input[type="text"]:focus {
-            border-color: #f1c40f;
-        }
+        input[type="text"]:focus { border-color: #f1c40f; }
         .btn {
-            background-color: #e74c3c;
-            color: #ffffff;
-            border: 2px solid #95a5a6;
-            padding: 10px;
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            border-radius: 2px;
-            transition: background 0.2s;
+            background-color: #e74c3c; color: #ffffff; border: 2px solid #95a5a6;
+            padding: 10px; font-family: inherit; font-size: 13px; font-weight: bold;
+            cursor: pointer; text-transform: uppercase; border-radius: 2px; transition: background 0.2s;
         }
-        .btn:hover {
-            background-color: #c0392b;
-        }
-        #leaderboard-box {
-            flex-grow: 1;
-            background-color: #1e1e1e;
-            border: 2px solid #555555;
-            padding: 8px;
-            overflow-y: auto;
-            border-radius: 2px;
-        }
-        ol {
-            margin: 0;
-            padding-left: 20px;
-            font-size: 12px;
-        }
-        li {
-            margin-bottom: 6px;
-            color: #dddddd;
-            word-break: break-all;
-        }
-        .empty-lead {
-            color: #777;
-            font-size: 12px;
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        /* Flexible Mobile Touch Controls */
-        #mobile-controls {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        .touch-group {
-            display: flex;
-            gap: 10px;
-        }
+        .btn:hover { background-color: #c0392b; }
+        #leaderboard-box { flex-grow: 1; background-color: #1e1e1e; border: 2px solid #555555; padding: 8px; overflow-y: auto; border-radius: 2px; }
+        ol { margin: 0; padding-left: 20px; font-size: 12px; }
+        li { margin-bottom: 6px; color: #dddddd; word-break: break-all; }
+        .empty-lead { color: #777; font-size: 12px; text-align: center; margin-top: 20px; }
+        #mobile-controls { width: 100%; display: flex; justify-content: space-between; margin-top: 10px; user-select: none; -webkit-user-select: none; }
+        .touch-group { display: flex; gap: 10px; }
         .touch-btn {
-            width: 55px;
-            height: 55px;
-            background-color: #333333;
-            border: 3px solid #555555;
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            touch-action: manipulation;
+            width: 55px; height: 55px; background-color: #333333; border: 3px solid #555555;
+            color: #ffffff; font-size: 20px; font-weight: bold; display: flex;
+            align-items: center; justify-content: center; border-radius: 8px; touch-action: manipulation;
         }
-        .touch-btn:active {
-            background-color: #f1c40f;
-            color: #000000;
-        }
-
-        .controls-hint {
-            margin-top: 10px;
-            color: #aaaaaa;
-            font-size: 12px;
-            text-align: center;
-        }
-
-        /* Responsive Layout Overrides */
+        .touch-btn:active { background-color: #f1c40f; color: #000000; }
+        .controls-hint { margin-top: 10px; color: #aaaaaa; font-size: 12px; text-align: center; }
         @media (max-width: 1000px) {
-            #main-wrapper {
-                flex-direction: column;
-                align-items: center;
-            }
-            #sidebar {
-                width: min(100vw - 20px, 800px);
-                height: 180px;
-            }
+            #main-wrapper { flex-direction: column; align-items: center; }
+            #sidebar { width: min(100vw - 20px, 800px); height: 180px; }
         }
-
-        /* Show rotate warning on vertical smartphone screens */
-        @media (max-width: 600px) and (orientation: portrait) {
-            #rotate-prompt {
-                display: flex;
-            }
-        }
+        @media (max-width: 600px) and (orientation: portrait) { #rotate-prompt { display: flex; } }
     </style>
 </head>
 <body>
@@ -262,7 +90,6 @@
                 </div>
                 <div id="status-display">Find the Chocolate Milk!</div>
             </div>
-            <!-- Internal Resolution remains 800x500 for game physics -->
             <canvas id="gameCanvas" width="800" height="500"></canvas>
         </div>
 
@@ -304,7 +131,6 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Game State
 let currentLevelIndex = 0;
 let levelPool = [];
 const TOTAL_LEVELS = 50;
@@ -321,26 +147,22 @@ function generateBeatableLevel() {
     let platforms = [];
     
     let startPlat = { 
-        x: 20, 
-        y: 420, 
-        width: 140, 
-        height: 20, 
-        type: 'normal', 
-        active: true 
+        x: 20, y: 420, width: 140, height: 20, 
+        type: 'normal', active: true 
     };
     platforms.push(startPlat);
 
     let currentX = startPlat.x;
     let currentY = startPlat.y;
-
     let targetPlatformCount = Math.floor(Math.random() * 3) + 6; 
 
     for (let i = 0; i < targetPlatformCount; i++) {
+        // Guaranteed higher chance for yellow disappearing platforms
         let randTypeRoll = Math.random();
         let platType = 'normal';
-        if (randTypeRoll < 0.30) platType = 'disappearing';
-        else if (randTypeRoll < 0.60) platType = 'horizontal';
-        else if (randTypeRoll < 0.80) platType = 'vertical';
+        if (randTypeRoll < 0.45) platType = 'disappearing';
+        else if (randTypeRoll < 0.70) platType = 'horizontal';
+        else platType = 'vertical';
 
         let maxVerticalUp = 110;
         let maxVerticalDown = 90;
@@ -358,7 +180,7 @@ function generateBeatableLevel() {
 
         let platWidth = Math.floor(Math.random() * 40) + 80;
 
-        let plat = {
+        platforms.push({
             x: nextX,
             y: nextY,
             startX: nextX,
@@ -368,23 +190,17 @@ function generateBeatableLevel() {
             type: platType,
             active: true,
             moveTimer: Math.random() * 100,
-            steppedOnTime: null // Tracks when the player steps on yellow platforms
-        };
+            steppedOnTime: null
+        });
 
-        platforms.push(plat);
         currentX = nextX;
         currentY = nextY;
     }
 
     let lastPlat = platforms[platforms.length - 1];
-    let milkPosition = {
-        x: lastPlat.x + (lastPlat.width / 2) - 12,
-        y: lastPlat.y - 36
-    };
-
     return {
         playerStart: { x: startPlat.x + 30, y: startPlat.y - 40 },
-        milk: milkPosition,
+        milk: { x: lastPlat.x + (lastPlat.width / 2) - 12, y: lastPlat.y - 36 },
         platforms: platforms
     };
 }
@@ -397,34 +213,17 @@ function initializeLevels() {
 }
 
 const player = {
-    x: 50,
-    y: 350,
-    width: 24,
-    height: 32,
-    vx: 0,
-    vy: 0,
-    speed: 4.5,
-    gravity: 0.5,
-    jumpForce: -9.5,
-    isGrounded: false,
-    jumpCount: 0,
-    maxJumps: 2,
-    facing: 'right'
+    x: 50, y: 350, width: 24, height: 32,
+    vx: 0, vy: 0, speed: 4.5, gravity: 0.5, jumpForce: -9.5,
+    isGrounded: false, jumpCount: 0, maxJumps: 2, facing: 'right'
 };
 
 const keys = { left: false, right: false, down: false, jumpPressed: false };
 
 window.addEventListener('keydown', (e) => {
     if (document.activeElement === document.getElementById('username-input')) return;
-
-    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        keys.left = true;
-        player.facing = 'left';
-    }
-    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        keys.right = true;
-        player.facing = 'right';
-    }
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { keys.left = true; player.facing = 'left'; }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { keys.right = true; player.facing = 'right'; }
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
     if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !keys.jumpPressed) {
         keys.jumpPressed = true;
@@ -441,25 +240,13 @@ window.addEventListener('keyup', (e) => {
 
 function bindTouchButton(elementId, actionName) {
     const btn = document.getElementById(elementId);
-    
     const startHandler = (e) => {
         e.preventDefault();
-        if (actionName === 'left') {
-            keys.left = true;
-            player.facing = 'left';
-        } else if (actionName === 'right') {
-            keys.right = true;
-            player.facing = 'right';
-        } else if (actionName === 'down') {
-            keys.down = true;
-        } else if (actionName === 'jump') {
-            if (!keys.jumpPressed) {
-                keys.jumpPressed = true;
-                handleJump();
-            }
-        }
+        if (actionName === 'left') { keys.left = true; player.facing = 'left'; }
+        else if (actionName === 'right') { keys.right = true; player.facing = 'right'; }
+        else if (actionName === 'down') { keys.down = true; }
+        else if (actionName === 'jump' && !keys.jumpPressed) { keys.jumpPressed = true; handleJump(); }
     };
-
     const endHandler = (e) => {
         e.preventDefault();
         if (actionName === 'left') keys.left = false;
@@ -467,7 +254,6 @@ function bindTouchButton(elementId, actionName) {
         if (actionName === 'down') keys.down = false;
         if (actionName === 'jump') keys.jumpPressed = false;
     };
-
     btn.addEventListener('touchstart', startHandler);
     btn.addEventListener('touchend', endHandler);
     btn.addEventListener('mousedown', startHandler);
@@ -501,47 +287,33 @@ function startTimer() {
 function updateTimerUI() {
     let mins = Math.floor(elapsedTime / 60);
     let secs = elapsedTime % 60;
-    let formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    document.getElementById('timer-display').innerText = `Time: ${formatted}`;
+    document.getElementById('timer-display').innerText = `Time: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
 function updateLeaderboardUI() {
     const list = document.getElementById('leaderboard-list');
     const emptyMsg = document.getElementById('empty-msg');
     list.innerHTML = '';
-
-    if (leaderboard.length === 0) {
-        emptyMsg.style.display = 'block';
-        return;
-    }
+    if (leaderboard.length === 0) { emptyMsg.style.display = 'block'; return; }
     emptyMsg.style.display = 'none';
-
     leaderboard.sort((a, b) => a.deaths - b.deaths || a.time - b.time);
-
     leaderboard.slice(0, 10).forEach(entry => {
         let li = document.createElement('li');
         let mins = Math.floor(entry.time / 60);
         let secs = entry.time % 60;
-        let tStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        li.innerText = `${entry.name} - ${entry.deaths} Deaths (${tStr})`;
+        li.innerText = `${entry.name} - ${entry.deaths} Deaths (${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')})`;
         list.appendChild(li);
     });
 }
 
 function saveRunToLeaderboard() {
     let username = document.getElementById('username-input').value.trim() || 'Player1';
-    leaderboard.push({
-        name: username,
-        deaths: deathCount,
-        time: elapsedTime
-    });
+    leaderboard.push({ name: username, deaths: deathCount, time: elapsedTime });
     localStorage.setItem('choc_milk_leaderboard', JSON.stringify(leaderboard));
     updateLeaderboardUI();
 }
 
-document.getElementById('reset-btn').addEventListener('click', () => {
-    fullResetGame();
-});
+document.getElementById('reset-btn').addEventListener('click', fullResetGame);
 
 function playerDie() {
     deathCount++;
@@ -577,11 +349,8 @@ function loadLevel(index) {
     const current = levelPool[index];
     player.x = current.playerStart.x;
     player.y = current.playerStart.y;
-    player.vx = 0;
-    player.vy = 0;
-    player.jumpCount = 0;
+    player.vx = 0; player.vy = 0; player.jumpCount = 0;
 
-    // Reset platform status
     current.platforms.forEach(plat => {
         plat.active = true;
         plat.steppedOnTime = null;
@@ -607,16 +376,14 @@ function update() {
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     
-    if (player.y > canvas.height) {
-        playerDie();
-        return;
-    }
+    if (player.y > canvas.height) { playerDie(); return; }
 
     player.isGrounded = false;
-
-    // Update platform movements and timed disappearances
     const now = Date.now();
+
     currentLevel.platforms.forEach(plat => {
+        if (!plat.active) return;
+
         if (plat.type === 'horizontal') {
             plat.moveTimer += 0.03;
             plat.x = plat.startX + Math.sin(plat.moveTimer) * 55;
@@ -625,34 +392,27 @@ function update() {
             plat.y = plat.startY + Math.sin(plat.moveTimer) * 40;
         }
 
-        // Disappear exactly 1 second (1000ms) after being stepped on
+        // Exact 1-second timeout (1000 ms) after touch
         if (plat.type === 'disappearing' && plat.steppedOnTime !== null) {
             if (now - plat.steppedOnTime >= 1000) {
                 plat.active = false;
             }
         }
-    });
 
-    currentLevel.platforms.forEach(plat => {
-        if (!plat.active) return;
-
+        // Precise AABB Landing Collision
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
-
         if (inXRange) {
             let feetPrev = player.y + player.height - player.vy;
-            
-            if (player.vy >= 0 && feetPrev <= plat.y + 10 && (player.y + player.height >= plat.y)) {
-                if (keys.down) {
-                    player.y += 6;
-                } else {
+            if (player.vy >= 0 && feetPrev <= plat.y + 8 && (player.y + player.height >= plat.y)) {
+                if (!keys.down) {
                     player.y = plat.y - player.height;
                     player.vy = 0;
                     player.isGrounded = true;
                     player.jumpCount = 0;
 
-                    // Trigger 1-second timer when stepped on
+                    // Trigger 1 second disappearance timer on touch
                     if (plat.type === 'disappearing' && plat.steppedOnTime === null) {
-                        plat.steppedOnTime = Date.now();
+                        plat.steppedOnTime = now;
                     }
                 }
             }
@@ -661,10 +421,8 @@ function update() {
 
     const milk = currentLevel.milk;
     if (
-        player.x < milk.x + 24 &&
-        player.x + player.width > milk.x &&
-        player.y < milk.y + 32 &&
-        player.y + player.height > milk.y
+        player.x < milk.x + 24 && player.x + player.width > milk.x &&
+        player.y < milk.y + 32 && player.y + player.height > milk.y
     ) {
         currentLevelIndex++;
         if (currentLevelIndex < levelPool.length) {
@@ -688,12 +446,12 @@ function render() {
 
         let color = '#ffffff'; 
         if (plat.type === 'disappearing') {
-            // Flash or fade slightly if stepped on
             if (plat.steppedOnTime !== null) {
-                let timeElapsed = Date.now() - plat.steppedOnTime;
-                color = timeElapsed % 100 < 50 ? '#f1c40f' : '#e67e22'; // Flashes yellow/orange before vanishing
+                // Flash quickly between red and yellow during the 1-second warning
+                let elapsed = Date.now() - plat.steppedOnTime;
+                color = (Math.floor(elapsed / 100) % 2 === 0) ? '#f1c40f' : '#e74c3c';
             } else {
-                color = '#f1c40f';
+                color = '#f1c40f'; // Normal yellow
             }
         } 
         else if (plat.type === 'horizontal') color = '#9b59b6'; 
@@ -707,53 +465,31 @@ function render() {
         ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
     });
 
+    // Milk Carton
     const milk = currentLevel.milk;
     const px = Math.floor(milk.x);
     const py = Math.floor(milk.y);
-
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(px + 14, py + 2, 4, 12);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(px + 14, py + 6, 4, 3);
-
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#e74c3c'; ctx.fillRect(px + 14, py + 2, 4, 12);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(px + 14, py + 6, 4, 3);
     ctx.fillRect(px + 4, py + 12, 16, 2);
-    
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(px + 4, py + 14, 3, 18);
-    ctx.fillRect(px + 17, py + 14, 3, 18);
-    
+    ctx.fillRect(px + 4, py + 14, 3, 18); ctx.fillRect(px + 17, py + 14, 3, 18);
     ctx.fillRect(px + 6, py + 30, 12, 3);
+    ctx.fillStyle = '#5c3a21'; ctx.fillRect(px + 7, py + 16, 10, 14);
 
-    ctx.fillStyle = '#5c3a21';
-    ctx.fillRect(px + 7, py + 16, 10, 14);
-
+    // Player
     const cx = Math.floor(player.x);
     const cy = Math.floor(player.y);
-
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(cx + 4, cy, 16, 6);
-
-    ctx.fillStyle = '#f5cd79';
-    ctx.fillRect(cx + 4, cy + 6, 16, 8);
-
+    ctx.fillStyle = '#2c3e50'; ctx.fillRect(cx + 4, cy, 16, 6);
+    ctx.fillStyle = '#f5cd79'; ctx.fillRect(cx + 4, cy + 6, 16, 8);
     ctx.fillStyle = '#000000';
     let eyeOffset = player.facing === 'right' ? 12 : 6;
     ctx.fillRect(cx + eyeOffset, cy + 8, 3, 3);
-
-    ctx.fillStyle = '#3498db';
-    ctx.fillRect(cx + 2, cy + 14, 20, 10);
-
+    ctx.fillStyle = '#3498db'; ctx.fillRect(cx + 2, cy + 14, 20, 10);
     ctx.fillStyle = '#2980b9';
-    if (player.facing === 'right') {
-        ctx.fillRect(cx + 20, cy + 15, 3, 7);
-    } else {
-        ctx.fillRect(cx + 1, cy + 15, 3, 7);
-    }
-
-    ctx.fillStyle = '#34495e';
-    ctx.fillRect(cx + 5, cy + 24, 5, 8);
-    ctx.fillRect(cx + 14, cy + 24, 5, 8);
+    if (player.facing === 'right') ctx.fillRect(cx + 20, cy + 15, 3, 7);
+    else ctx.fillRect(cx + 1, cy + 15, 3, 7);
+    ctx.fillStyle = '#34495e'; ctx.fillRect(cx + 5, cy + 24, 5, 8); ctx.fillRect(cx + 14, cy + 24, 5, 8);
 }
 
 function gameLoop() {

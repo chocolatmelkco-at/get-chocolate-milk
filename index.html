@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Get Chocolate Milk</title>
     <style>
         * {
@@ -369,7 +369,7 @@ function generateBeatableLevel() {
             active: true,
             moveTimer: Math.random() * 100,
             permanentlyGone: false,
-            spawnTime: Date.now() // Track spawn time for 20-second lifespan
+            spawnTime: Date.now() // Track spawn time for 10-second lifespan
         };
 
         platforms.push(plat);
@@ -632,8 +632,8 @@ function update() {
     currentLevel.platforms.forEach(plat => {
         if (!plat.active || plat.permanentlyGone) return;
 
-        // Disappear permanently after 20 seconds from level start
-        if (plat.type === 'disappearing' && Date.now() - plat.spawnTime >= 20000) {
+        // Disappear permanently after 10 seconds (10,000 ms) from level start
+        if (plat.type === 'disappearing' && Date.now() - plat.spawnTime >= 10000) {
             plat.active = false;
             plat.permanentlyGone = true;
             return;

@@ -18,6 +18,11 @@
             min-height: 100vh;
             overflow: hidden;
         }
+        #main-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
         #game-container {
             position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.7);
@@ -38,10 +43,98 @@
             right: 10px;
             display: flex;
             justify-content: space-between;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             text-shadow: 2px 2px 0px #000;
             pointer-events: none;
+        }
+        .stats-bar {
+            display: flex;
+            gap: 15px;
+        }
+        /* Sidebar Styles */
+        #sidebar {
+            width: 260px;
+            height: 500px;
+            background-color: #2b2b2b;
+            border: 4px solid #555555;
+            border-radius: 4px;
+            box-sizing: border-box;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+        h2, h3 {
+            margin: 0;
+            text-align: center;
+            color: #f1c40f;
+            text-transform: uppercase;
+            font-size: 16px;
+            letter-spacing: 1px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-size: 12px;
+            color: #aaaaaa;
+        }
+        input[type="text"] {
+            background-color: #1e1e1e;
+            border: 2px solid #555555;
+            color: #ffffff;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #f1c40f;
+        }
+        .btn {
+            background-color: #e74c3c;
+            color: #ffffff;
+            border: 2px solid #95a5a6;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            border-radius: 2px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background-color: #c0392b;
+        }
+        #leaderboard-box {
+            flex-grow: 1;
+            background-color: #1e1e1e;
+            border: 2px solid #555555;
+            padding: 8px;
+            overflow-y: auto;
+            border-radius: 2px;
+        }
+        ol {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 12px;
+        }
+        li {
+            margin-bottom: 6px;
+            color: #dddddd;
+            word-break: break-all;
+        }
+        .empty-lead {
+            color: #777;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 20px;
         }
         .controls-hint {
             margin-top: 15px;
@@ -53,13 +146,37 @@
 </head>
 <body>
 
-<div id="game-container">
-    <div id="ui">
-        <div id="level-display">Level: 1 / 50</div>
-        <div id="status-display">Find the Chocolate Milk!</div>
+<div id="main-wrapper">
+    <div id="game-container">
+        <div id="ui">
+            <div id="level-display">Level: 1 / 50</div>
+            <div class="stats-bar">
+                <div id="timer-display">Time: 00:00</div>
+                <div id="deaths-display">Deaths: 0</div>
+            </div>
+            <div id="status-display">Find the Chocolate Milk!</div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
     </div>
-    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div id="sidebar">
+        <h2>Settings</h2>
+        <div class="input-group">
+            <label for="username-input">PLAYER USERNAME:</label>
+            <input type="text" id="username-input" maxlength="12" value="Player1">
+        </div>
+        <button class="btn" id="reset-btn">Reset to Level 1</button>
+
+        <hr style="border: 1px solid #444; width: 100%; margin: 5px 0;">
+
+        <h3>Leaderboard</h3>
+        <div id="leaderboard-box">
+            <ol id="leaderboard-list"></ol>
+            <div id="empty-msg" class="empty-lead">No completed runs yet!</div>
+        </div>
+    </div>
 </div>
+
 <div class="controls-hint">
     <b>Controls:</b> A/D or Arrows to Move | SPACE / W / UP to Double Jump | DOWN / S to Drop Through Platforms
 </div>
@@ -73,7 +190,16 @@ let currentLevelIndex = 0;
 let levelPool = [];
 const TOTAL_LEVELS = 50;
 
-// --- PROCEDURAL LEVEL GENERATOR WITH SPECIAL PLATFORM TYPES ---
+let deathCount = 0;
+let startTime = Date.now();
+let elapsedTime = 0; // in seconds
+let timerInterval = null;
+let gameFinished = false;
+
+// LocalStorage Leaderboard Array
+let leaderboard = JSON.parse(localStorage.getItem('choc_milk_leaderboard')) || [];
+
+// --- PROCEDURAL LEVEL GENERATOR WITH SOLID COLOR PLATFORMS ---
 function generateBeatableLevel() {
     let platforms = [];
     
@@ -125,7 +251,6 @@ function generateBeatableLevel() {
             height: 18,
             type: platType,
             active: true,
-            moveDir: 1,
             moveTimer: Math.random() * 100,
             disappearTimer: 0
         };
@@ -177,6 +302,9 @@ const player = {
 const keys = { left: false, right: false, down: false, jumpPressed: false };
 
 window.addEventListener('keydown', (e) => {
+    // Prevent key interaction if user is typing username
+    if (document.activeElement === document.getElementById('username-input')) return;
+
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
         keys.left = true;
         player.facing = 'left';
@@ -207,10 +335,93 @@ function handleJump() {
     }
 }
 
+// --- TIMER & LEADERBOARD SYSTEM ---
+function startTimer() {
+    clearInterval(timerInterval);
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+        if (!gameFinished) {
+            elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            updateTimerUI();
+        }
+    }, 1000);
+}
+
+function updateTimerUI() {
+    let mins = Math.floor(elapsedTime / 60);
+    let secs = elapsedTime % 60;
+    let formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    document.getElementById('timer-display').innerText = `Time: ${formatted}`;
+}
+
+function updateLeaderboardUI() {
+    const list = document.getElementById('leaderboard-list');
+    const emptyMsg = document.getElementById('empty-msg');
+    list.innerHTML = '';
+
+    if (leaderboard.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+
+    // Sort by deaths asc, then time asc
+    leaderboard.sort((a, b) => a.deaths - b.deaths || a.time - b.time);
+
+    leaderboard.slice(0, 10).forEach(entry => {
+        let li = document.createElement('li');
+        let mins = Math.floor(entry.time / 60);
+        let secs = entry.time % 60;
+        let tStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        li.innerText = `${entry.name} - ${entry.deaths} Deaths (${tStr})`;
+        list.appendChild(li);
+    });
+}
+
+function saveRunToLeaderboard() {
+    let username = document.getElementById('username-input').value.trim() || 'Player1';
+    leaderboard.push({
+        name: username,
+        deaths: deathCount,
+        time: elapsedTime
+    });
+    localStorage.setItem('choc_milk_leaderboard', JSON.stringify(leaderboard));
+    updateLeaderboardUI();
+}
+
+// --- RESET & DEATH LOGIC ---
+document.getElementById('reset-btn').addEventListener('click', () => {
+    fullResetGame();
+});
+
+function playerDie() {
+    deathCount++;
+    document.getElementById('deaths-display').innerText = `Deaths: ${deathCount}`;
+    // Send player back to Level 1 on death
+    currentLevelIndex = 0;
+    loadLevel(0);
+}
+
+function fullResetGame() {
+    deathCount = 0;
+    gameFinished = false;
+    document.getElementById('deaths-display').innerText = `Deaths: 0`;
+    document.getElementById('status-display').innerText = "Find the Chocolate Milk!";
+    initializeLevels();
+    currentLevelIndex = 0;
+    elapsedTime = 0;
+    updateTimerUI();
+    startTimer();
+    loadLevel(0);
+}
+
 // --- GAME LOGIC ---
 function loadLevel(index) {
     if (index >= levelPool.length) {
-        document.getElementById('status-display').innerText = "YOU WIN! ALL 50 LEVELS CLEAR!";
+        gameFinished = true;
+        clearInterval(timerInterval);
+        document.getElementById('status-display').innerText = "YOU WIN! ALL 50 CLEAR!";
+        saveRunToLeaderboard();
         return;
     }
     const current = levelPool[index];
@@ -223,6 +434,8 @@ function loadLevel(index) {
 }
 
 function update() {
+    if (gameFinished) return;
+
     const currentLevel = levelPool[currentLevelIndex];
     if (!currentLevel) return;
 
@@ -238,7 +451,12 @@ function update() {
     // Screen Boundary
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-    if (player.y > canvas.height) loadLevel(currentLevelIndex); // Respawn on fall
+    
+    // DIE & RESET TO LEVEL 1 ON FALL
+    if (player.y > canvas.height) {
+        playerDie();
+        return;
+    }
 
     player.isGrounded = false;
 
@@ -302,7 +520,10 @@ function update() {
         if (currentLevelIndex < levelPool.length) {
             loadLevel(currentLevelIndex);
         } else {
-            document.getElementById('status-display').innerText = "YOU WIN! ALL 50 LEVELS CLEAR!";
+            gameFinished = true;
+            clearInterval(timerInterval);
+            document.getElementById('status-display').innerText = "YOU WIN! ALL 50 CLEAR!";
+            saveRunToLeaderboard();
         }
     }
 }
@@ -400,9 +621,10 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Start Game
+// Init
 initializeLevels();
-loadLevel(0);
+updateLeaderboardUI();
+fullResetGame();
 gameLoop();
 </script>
 </body>

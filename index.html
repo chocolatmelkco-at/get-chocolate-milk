@@ -368,7 +368,8 @@ function generateBeatableLevel() {
             type: platType,
             active: true,
             moveTimer: Math.random() * 100,
-            permanentlyGone: false
+            permanentlyGone: false,
+            spawnTime: Date.now() // Track spawn time for 20-second lifespan
         };
 
         platforms.push(plat);
@@ -581,7 +582,16 @@ function loadLevel(index) {
     player.vx = 0;
     player.vy = 0;
     player.jumpCount = 0;
-    current.levelStartTime = Date.now();
+
+    // Reset platform status and timer for the current level
+    const now = Date.now();
+    current.levelStartTime = now;
+    current.platforms.forEach(plat => {
+        plat.active = true;
+        plat.permanentlyGone = false;
+        plat.spawnTime = now;
+    });
+
     document.getElementById('level-display').innerText = `Level: ${index + 1} / ${TOTAL_LEVELS}`;
 }
 
@@ -608,7 +618,6 @@ function update() {
     }
 
     player.isGrounded = false;
-    let levelAge = (Date.now() - (currentLevel.levelStartTime || Date.now())) / 1000;
 
     currentLevel.platforms.forEach(plat => {
         if (plat.type === 'horizontal') {
@@ -623,6 +632,13 @@ function update() {
     currentLevel.platforms.forEach(plat => {
         if (!plat.active || plat.permanentlyGone) return;
 
+        // Disappear permanently after 20 seconds from level start
+        if (plat.type === 'disappearing' && Date.now() - plat.spawnTime >= 20000) {
+            plat.active = false;
+            plat.permanentlyGone = true;
+            return;
+        }
+
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
         if (inXRange) {
@@ -636,19 +652,6 @@ function update() {
                     player.vy = 0;
                     player.isGrounded = true;
                     player.jumpCount = 0;
-
-                    if (plat.type === 'disappearing') {
-                        plat.active = false;
-                        if (levelAge >= 20) {
-                            plat.permanentlyGone = true;
-                        } else {
-                            setTimeout(() => {
-                                if (!plat.permanentlyGone) {
-                                    plat.active = true;
-                                }
-                            }, 1500);
-                        }
-                    }
                 }
             }
         }

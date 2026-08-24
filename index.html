@@ -311,7 +311,7 @@ function generateBeatableLevel() {
             type: platType,
             active: true,
             moveTimer: Math.random() * 100,
-            disappearTimer: 0
+            permanentlyGone: false
         };
 
         platforms.push(plat);
@@ -329,7 +329,8 @@ function generateBeatableLevel() {
     return {
         playerStart: { x: startPlat.x + 30, y: startPlat.y - 40 },
         milk: milkPosition,
-        platforms: platforms
+        platforms: platforms,
+        levelStartTime: null
     };
 }
 
@@ -495,14 +496,12 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 function playerDie() {
     deathCount++;
     document.getElementById('deaths-display').innerText = `Deaths: ${deathCount}`;
-    currentLevelIndex = 0;
-    loadLevel(0);
+    // Always sent back to Level 1 on death regardless of level progression
+    fullResetGameKeepDeaths();
 }
 
-function fullResetGame() {
-    deathCount = 0;
+function fullResetGameKeepDeaths() {
     gameFinished = false;
-    document.getElementById('deaths-display').innerText = `Deaths: 0`;
     document.getElementById('status-display').innerText = "Find the Chocolate Milk!";
     initializeLevels();
     currentLevelIndex = 0;
@@ -510,6 +509,12 @@ function fullResetGame() {
     updateTimerUI();
     startTimer();
     loadLevel(0);
+}
+
+function fullResetGame() {
+    deathCount = 0;
+    document.getElementById('deaths-display').innerText = `Deaths: 0`;
+    fullResetGameKeepDeaths();
 }
 
 // --- GAME LOGIC ---
@@ -527,6 +532,7 @@ function loadLevel(index) {
     player.vx = 0;
     player.vy = 0;
     player.jumpCount = 0;
+    current.levelStartTime = Date.now();
     document.getElementById('level-display').innerText = `Level: ${index + 1} / ${TOTAL_LEVELS}`;
 }
 
@@ -547,12 +553,16 @@ function update() {
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     
+    // DIE & RESET TO LEVEL 1 ON FALL (REGARDLESS OF WHERE YOU ARE)
     if (player.y > canvas.height) {
         playerDie();
         return;
     }
 
     player.isGrounded = false;
+
+    // Track level time for 20-second disappearing platform rule
+    let levelAge = (Date.now() - (currentLevel.levelStartTime || Date.now())) / 1000;
 
     currentLevel.platforms.forEach(plat => {
         if (plat.type === 'horizontal') {
@@ -562,18 +572,11 @@ function update() {
             plat.moveTimer += 0.03;
             plat.y = plat.startY + Math.sin(plat.moveTimer) * 40;
         }
-
-        if (!plat.active) {
-            plat.disappearTimer++;
-            if (plat.disappearTimer > 90) {
-                plat.active = true;
-                plat.disappearTimer = 0;
-            }
-        }
     });
 
+    // Platform Collisions
     currentLevel.platforms.forEach(plat => {
-        if (!plat.active) return;
+        if (!plat.active || plat.permanentlyGone) return;
 
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
@@ -591,7 +594,17 @@ function update() {
 
                     if (plat.type === 'disappearing') {
                         plat.active = false;
-                        plat.disappearTimer = 0;
+                        if (levelAge >= 20) {
+                            // After 20 seconds, disappearing platforms vanish permanently until a full reset to level 1
+                            plat.permanentlyGone = true;
+                        } else {
+                            // Before 20 seconds, temporary disappear
+                            setTimeout(() => {
+                                if (!plat.permanentlyGone) {
+                                    plat.active = true;
+                                }
+                            }, 1500);
+                        }
                     }
                 }
             }
@@ -625,7 +638,7 @@ function render() {
 
     // 1. Draw Platforms
     currentLevel.platforms.forEach(plat => {
-        if (!plat.active) return;
+        if (!plat.active || plat.permanentlyGone) return;
 
         let color = '#ffffff'; // Default White (Normal)
         if (plat.type === 'disappearing') color = '#f1c40f'; // Yellow

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Get Chocolate Milk</title>
     <style>
         body {
@@ -17,6 +17,7 @@
             justify-content: center;
             min-height: 100vh;
             overflow: hidden;
+            touch-action: manipulation;
         }
         #main-wrapper {
             display: flex;
@@ -136,27 +137,85 @@
             text-align: center;
             margin-top: 20px;
         }
+        
+        /* On-Screen Mobile Controls */
+        #mobile-controls {
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .touch-group {
+            display: flex;
+            gap: 10px;
+        }
+        .touch-btn {
+            width: 60px;
+            height: 60px;
+            background-color: #333333;
+            border: 3px solid #555555;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+        .touch-btn:active {
+            background-color: #f1c40f;
+            color: #000000;
+        }
+
         .controls-hint {
-            margin-top: 15px;
+            margin-top: 10px;
             color: #aaaaaa;
             font-size: 13px;
             text-align: center;
+        }
+
+        @media (max-width: 1100px) {
+            #main-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            #sidebar {
+                width: 800px;
+                height: 200px;
+            }
         }
     </style>
 </head>
 <body>
 
 <div id="main-wrapper">
-    <div id="game-container">
-        <div id="ui">
-            <div id="level-display">Level: 1 / 50</div>
-            <div class="stats-bar">
-                <div id="timer-display">Time: 00:00</div>
-                <div id="deaths-display">Deaths: 0</div>
+    <div>
+        <div id="game-container">
+            <div id="ui">
+                <div id="level-display">Level: 1 / 50</div>
+                <div class="stats-bar">
+                    <div id="timer-display">Time: 00:00</div>
+                    <div id="deaths-display">Deaths: 0</div>
+                </div>
+                <div id="status-display">Find the Chocolate Milk!</div>
             </div>
-            <div id="status-display">Find the Chocolate Milk!</div>
+            <canvas id="gameCanvas" width="800" height="500"></canvas>
         </div>
-        <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+        <!-- Touch Controls Container -->
+        <div id="mobile-controls">
+            <div class="touch-group">
+                <div class="touch-btn" id="btn-left">◀</div>
+                <div class="touch-btn" id="btn-right">▶</div>
+                <div class="touch-btn" id="btn-down">▼</div>
+            </div>
+            <div class="touch-group">
+                <div class="touch-btn" id="btn-jump" style="width: 100px;">JUMP</div>
+            </div>
+        </div>
     </div>
 
     <div id="sidebar">
@@ -178,7 +237,7 @@
 </div>
 
 <div class="controls-hint">
-    <b>Controls:</b> A/D or Arrows to Move | SPACE / W / UP to Double Jump | DOWN / S to Drop Through Platforms
+    <b>Controls:</b> Keyboard (A/D/Arrows/Space) OR On-Screen Touch Controls
 </div>
 
 <script>
@@ -302,7 +361,6 @@ const player = {
 const keys = { left: false, right: false, down: false, jumpPressed: false };
 
 window.addEventListener('keydown', (e) => {
-    // Prevent key interaction if user is typing username
     if (document.activeElement === document.getElementById('username-input')) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
@@ -326,6 +384,47 @@ window.addEventListener('keyup', (e) => {
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
     if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.jumpPressed = false;
 });
+
+// --- MOBILE TOUCH LISTENERS ---
+function bindTouchButton(elementId, actionName) {
+    const btn = document.getElementById(elementId);
+    
+    const startHandler = (e) => {
+        e.preventDefault();
+        if (actionName === 'left') {
+            keys.left = true;
+            player.facing = 'left';
+        } else if (actionName === 'right') {
+            keys.right = true;
+            player.facing = 'right';
+        } else if (actionName === 'down') {
+            keys.down = true;
+        } else if (actionName === 'jump') {
+            if (!keys.jumpPressed) {
+                keys.jumpPressed = true;
+                handleJump();
+            }
+        }
+    };
+
+    const endHandler = (e) => {
+        e.preventDefault();
+        if (actionName === 'left') keys.left = false;
+        if (actionName === 'right') keys.right = false;
+        if (actionName === 'down') keys.down = false;
+        if (actionName === 'jump') keys.jumpPressed = false;
+    };
+
+    btn.addEventListener('touchstart', startHandler);
+    btn.addEventListener('touchend', endHandler);
+    btn.addEventListener('mousedown', startHandler);
+    btn.addEventListener('mouseup', endHandler);
+}
+
+bindTouchButton('btn-left', 'left');
+bindTouchButton('btn-right', 'right');
+bindTouchButton('btn-down', 'down');
+bindTouchButton('btn-jump', 'jump');
 
 function handleJump() {
     if (player.jumpCount < player.maxJumps) {
@@ -365,7 +464,6 @@ function updateLeaderboardUI() {
     }
     emptyMsg.style.display = 'none';
 
-    // Sort by deaths asc, then time asc
     leaderboard.sort((a, b) => a.deaths - b.deaths || a.time - b.time);
 
     leaderboard.slice(0, 10).forEach(entry => {
@@ -397,7 +495,6 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 function playerDie() {
     deathCount++;
     document.getElementById('deaths-display').innerText = `Deaths: ${deathCount}`;
-    // Send player back to Level 1 on death
     currentLevelIndex = 0;
     loadLevel(0);
 }
@@ -439,7 +536,6 @@ function update() {
     const currentLevel = levelPool[currentLevelIndex];
     if (!currentLevel) return;
 
-    // Movement
     if (keys.left) player.vx = -player.speed;
     else if (keys.right) player.vx = player.speed;
     else player.vx = 0;
@@ -448,11 +544,9 @@ function update() {
     player.vy += player.gravity;
     player.y += player.vy;
 
-    // Screen Boundary
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     
-    // DIE & RESET TO LEVEL 1 ON FALL
     if (player.y > canvas.height) {
         playerDie();
         return;
@@ -460,7 +554,6 @@ function update() {
 
     player.isGrounded = false;
 
-    // Update Platforms (Movement & Disappearing timers)
     currentLevel.platforms.forEach(plat => {
         if (plat.type === 'horizontal') {
             plat.moveTimer += 0.03;
@@ -472,14 +565,13 @@ function update() {
 
         if (!plat.active) {
             plat.disappearTimer++;
-            if (plat.disappearTimer > 90) { // Reappear after 1.5 seconds
+            if (plat.disappearTimer > 90) {
                 plat.active = true;
                 plat.disappearTimer = 0;
             }
         }
     });
 
-    // Platform Collisions
     currentLevel.platforms.forEach(plat => {
         if (!plat.active) return;
 
@@ -488,17 +580,15 @@ function update() {
         if (inXRange) {
             let feetPrev = player.y + player.height - player.vy;
             
-            // Landing on top
             if (player.vy >= 0 && feetPrev <= plat.y + 10 && (player.y + player.height >= plat.y)) {
                 if (keys.down) {
-                    player.y += 6; // Drop down
+                    player.y += 6;
                 } else {
                     player.y = plat.y - player.height;
                     player.vy = 0;
                     player.isGrounded = true;
                     player.jumpCount = 0;
 
-                    // If Yellow Disappearing Platform, trigger vanish countdown
                     if (plat.type === 'disappearing') {
                         plat.active = false;
                         plat.disappearTimer = 0;
@@ -508,7 +598,6 @@ function update() {
         }
     });
 
-    // Check Goal (Chocolate Milk Glass) Collision
     const milk = currentLevel.milk;
     if (
         player.x < milk.x + 24 &&
@@ -546,7 +635,6 @@ function render() {
         ctx.fillStyle = color;
         ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
 
-        // Pixel border effect
         ctx.strokeStyle = '#111111';
         ctx.lineWidth = 2;
         ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
@@ -557,50 +645,40 @@ function render() {
     const px = Math.floor(milk.x);
     const py = Math.floor(milk.y);
 
-    // Straw (Red/White pixel blocks)
     ctx.fillStyle = '#e74c3c';
     ctx.fillRect(px + 14, py + 2, 4, 12);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(px + 14, py + 6, 4, 3);
 
-    // Glass Outline & Body
-    ctx.fillStyle = '#ffffff'; // Glass rim/highlights
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(px + 4, py + 12, 16, 2);
     
-    // Glass Walls
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillRect(px + 4, py + 14, 3, 18);
     ctx.fillRect(px + 17, py + 14, 3, 18);
     
-    // Base of Glass
     ctx.fillRect(px + 6, py + 30, 12, 3);
 
-    // Chocolate Milk Liquid inside
-    ctx.fillStyle = '#5c3a21'; // Rich chocolate brown
+    ctx.fillStyle = '#5c3a21';
     ctx.fillRect(px + 7, py + 16, 10, 14);
 
     // 3. Draw Pixelated Person Character
     const cx = Math.floor(player.x);
     const cy = Math.floor(player.y);
 
-    // Hair / Hat (Dark Blue / Black pixel blocks)
     ctx.fillStyle = '#2c3e50';
     ctx.fillRect(cx + 4, cy, 16, 6);
 
-    // Face / Head
     ctx.fillStyle = '#f5cd79';
     ctx.fillRect(cx + 4, cy + 6, 16, 8);
 
-    // Eyes (Facing direction)
     ctx.fillStyle = '#000000';
     let eyeOffset = player.facing === 'right' ? 12 : 6;
     ctx.fillRect(cx + eyeOffset, cy + 8, 3, 3);
 
-    // Shirt / Torso (Bright Blue)
     ctx.fillStyle = '#3498db';
     ctx.fillRect(cx + 2, cy + 14, 20, 10);
 
-    // Arms
     ctx.fillStyle = '#2980b9';
     if (player.facing === 'right') {
         ctx.fillRect(cx + 20, cy + 15, 3, 7);
@@ -608,7 +686,6 @@ function render() {
         ctx.fillRect(cx + 1, cy + 15, 3, 7);
     }
 
-    // Legs / Pants (Dark Grey pixel blocks)
     ctx.fillStyle = '#34495e';
     ctx.fillRect(cx + 5, cy + 24, 5, 8);
     ctx.fillRect(cx + 14, cy + 24, 5, 8);

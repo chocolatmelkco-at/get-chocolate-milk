@@ -1,567 +1,325 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>17-Level Fixed Puzzle Platformer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Chocolate Milk</title>
     <style>
-        * {
-            box-sizing: border-box;
-            touch-action: manipulation;
-            user-select: none;
-            -webkit-user-select: none;
-        }
         body {
             margin: 0;
-            background: #222;
+            padding: 0;
+            background-color: #1a1a24;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: sans-serif;
             flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
             overflow: hidden;
         }
-        #gameContainer {
+        #game-container {
             position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
         }
         canvas {
-            background: #334;
-            border: 4px solid #fff;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            max-width: 100vw;
-            max-height: 60vh;
+            background: linear-gradient(to bottom, #2b1055, #7597de);
+            display: block;
         }
         #ui {
-            margin-bottom: 10px;
-            font-size: 24px;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        #resetBtn {
-            margin-top: 10px;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            background-color: #FF5533;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            transition: background 0.2s;
-        }
-        #resetBtn:hover {
-            background-color: #ff3311;
-        }
-
-        /* MOBILE TOUCH CONTROLS */
-        #mobileControls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             display: flex;
             justify-content: space-between;
-            width: 100%;
-            max-width: 800px;
-            padding: 10px 20px;
-            margin-top: 5px;
-        }
-        .dpad, .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        .touch-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid #fff;
-            border-radius: 12px;
-            color: white;
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            touch-action: none;
-            cursor: pointer;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
         }
-        .touch-btn:active, .touch-btn.pressed {
-            background: rgba(255, 255, 255, 0.5);
-            transform: scale(0.95);
-        }
-        #jumpBtn {
-            width: 80px;
-            background: rgba(46, 204, 113, 0.4);
-            border-color: #2ECC71;
-        }
-        #jumpBtn:active, #jumpBtn.pressed {
-            background: rgba(46, 204, 113, 0.7);
+        .controls-hint {
+            margin-top: 15px;
+            color: #a0a0c0;
+            font-size: 14px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">LEVEL: <span id="levelNum">1</span> / 17</div>
-    
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
-        
-        <!-- MOBILE TOUCH BUTTONS -->
-        <div id="mobileControls">
-            <div class="dpad">
-                <div class="touch-btn" id="leftBtn">◀</div>
-                <div class="touch-btn" id="rightBtn">▶</div>
-            </div>
-            <div class="action-buttons">
-                <div class="touch-btn" id="jumpBtn">JUMP</div>
-            </div>
-        </div>
+<div id="game-container">
+    <div id="ui">
+        <div id="level-display">Level: 1 / 50</div>
+        <div id="status-display">Find the Chocolate Milk!</div>
     </div>
-    
-    <button id="resetBtn" onclick="resetEntireGame()">Reset Game</button>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+</div>
+<div class="controls-hint">
+    <b>Controls:</b> A/D or Arrow Keys to Move | SPACE / W to Jump (Double-Tap on Stacked) | DOWN / S to Drop Down
+</div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const levelNumDisplay = document.getElementById("levelNum");
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-const gravity = 0.5;
-const keys = {};
-let currentLevel = 0; 
-let levelStartTime = Date.now(); 
+// --- GAME STATE ---
+let currentLevelIndex = 0;
+let levelPool = [];
+const TOTAL_LEVELS = 50;
 
+// --- GUARANTEED BEATABLE PROCEDURAL LEVEL GENERATOR ---
+function generateBeatableLevel() {
+    let platforms = [];
+    
+    // 1. Starting Platform
+    let startPlat = { x: 20, y: 420, width: 140, height: 20, stacked: false };
+    platforms.push(startPlat);
+
+    let currentX = startPlat.x;
+    let currentY = startPlat.y;
+
+    // Chain 6 to 9 reachable platforms
+    let targetPlatformCount = Math.floor(Math.random() * 4) + 6; 
+
+    for (let i = 0; i < targetPlatformCount; i++) {
+        let isStacked = Math.random() < 0.35; // 35% chance for stacked platform
+
+        // Max jump constraints matching player physics
+        let maxVerticalUp = isStacked ? 120 : 75;
+        let maxVerticalDown = 90;
+        let maxHorizontalGap = isStacked ? 150 : 130;
+
+        let minX = currentX + 85; 
+        let maxX = currentX + maxHorizontalGap;
+        let nextX = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+
+        let minY = Math.max(120, currentY - maxVerticalUp);
+        let maxY = Math.min(430, currentY + maxVerticalDown);
+        let nextY = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+
+        if (nextX + 90 > 770) break; // Keep inside canvas boundary
+
+        let platWidth = Math.floor(Math.random() * 40) + 90;
+
+        platforms.push({
+            x: nextX,
+            y: nextY,
+            width: platWidth,
+            height: 20,
+            stacked: isStacked
+        });
+
+        currentX = nextX;
+        currentY = nextY;
+    }
+
+    // 2. Goal Platform + Chocolate Milk
+    let lastPlat = platforms[platforms.length - 1];
+    let milkPosition = {
+        x: lastPlat.x + (lastPlat.width / 2) - 15,
+        y: lastPlat.y - 40
+    };
+
+    return {
+        playerStart: { x: startPlat.x + 30, y: startPlat.y - 40 },
+        milk: milkPosition,
+        platforms: platforms
+    };
+}
+
+function initializeLevels() {
+    levelPool = [];
+    for (let i = 0; i < TOTAL_LEVELS; i++) {
+        levelPool.push(generateBeatableLevel());
+    }
+}
+
+// --- PLAYER OBJECT ---
 const player = {
-    x: 40,
-    y: 300,
-    width: 24,
-    height: 32,
-    velX: 0,
-    velY: 0,
-    speed: 4,
-    jumpForce: 13,
-    grounded: false
+    x: 50,
+    y: 350,
+    width: 28,
+    height: 36,
+    vx: 0,
+    vy: 0,
+    speed: 4.5,
+    gravity: 0.5,
+    jumpForce: -9.5,
+    isGrounded: false,
+    jumpCount: 0,
+    maxJumps: 1
 };
 
-// HAND-DESIGNED 17 LEVELS DEFINITIONS
-const levels = [
-    { // LEVEL 1
-        platforms: [
-            { x: 0, y: 380, width: 800, height: 20, type: "normal" }, 
-            { x: 200, y: 260, width: 120, height: 15, type: "normal" }, 
-            { x: 400, y: 200, width: 150, height: 15, type: "disappearing", active: true }, 
-            { x: 620, y: 150, width: 120, height: 15, type: "normal" }
-        ],
-        goal: { x: 670, y: 100, width: 20, height: 30 },
-        boxes: [], hole: null
-    },
-    { // LEVEL 2: BOX PUZZLE
-        platforms: [
-            { x: 0, y: 380, width: 300, height: 20, type: "normal" },   
-            { x: 400, y: 380, width: 400, height: 20, type: "normal" },  
-            { x: 650, y: 240, width: 120, height: 15, type: "bridge", active: false } 
-        ],
-        hole: { x: 300, y: 380, width: 100, height: 20, activated: false },
-        boxes: [{ x: 180, y: 340, width: 40, height: 40, velX: 0, velY: 0, grounded: false }],
-        goal: { x: 700, y: 190, width: 20, height: 30 }
-    },
-    { // LEVEL 3: FIXED MOVING PLATFORM DISTANCE
-        platforms: [
-            { x: 0, y: 380, width: 150, height: 20, type: "normal" },
-            { x: 160, y: 280, width: 120, height: 15, type: "movingHoriz", speed: 2.5, minX: 160, maxX: 530, dir: 1 },
-            { x: 600, y: 180, width: 140, height: 15, type: "normal" }
-        ],
-        goal: { x: 670, y: 130, width: 20, height: 30 },
-        boxes: [], hole: null
-    },
-    { // LEVEL 4: HARDER BOX PUZZLE
-        platforms: [
-            { x: 0, y: 380, width: 400, height: 20, type: "normal" },
-            { x: 550, y: 380, width: 250, height: 20, type: "normal" },
-            { x: 650, y: 220, width: 100, height: 15, type: "bridge", active: false }
-        ],
-        hole: { x: 400, y: 380, width: 150, height: 20, activated: false },
-        boxes: [{ x: 250, y: 340, width: 40, height: 40, velX: 0, velY: 0, grounded: false }],
-        goal: { x: 690, y: 170, width: 20, height: 30 }
-    },
-    { // LEVEL 5: VERTICAL MOVING PLATFORM + DISAPPEARING
-        platforms: [
-            { x: 0, y: 380, width: 150, height: 20, type: "normal" },
-            { x: 200, y: 320, width: 100, height: 15, type: "disappearing", active: true },
-            { x: 380, y: 300, width: 110, height: 15, type: "movingVert", speed: 2.5, minY: 140, maxY: 320, dir: -1 },
-            { x: 600, y: 140, width: 150, height: 15, type: "normal" }
-        ],
-        goal: { x: 700, y: 90, width: 20, height: 30 },
-        boxes: [], hole: null
-    },
-    ...Array.from({ length: 12 }, (_, index) => {
-        let isMoving = index % 2 === 0;
-        return {
-            platforms: [
-                { x: 0, y: 380, width: 150, height: 20, type: "normal" },
-                isMoving 
-                  ? { x: 200, y: 300 - (index * 6), width: 100, height: 15, type: "movingHoriz", speed: 2, minX: 180, maxX: 450, dir: 1 }
-                  : { x: 200, y: 300 - (index * 6), width: 100, height: 15, type: "normal" },
-                { x: 380, y: 240 - (index * 6), width: 80, height: 15, type: "disappearing", active: true },
-                { x: 540, y: 180 - (index * 4), width: 90, height: 15, type: "normal" },
-                { x: 680, y: 140, width: 100, height: 15, type: "normal" }
-            ],
-            goal: { x: 720, y: 90, width: 20, height: 30 },
-            boxes: [], hole: null
-        };
-    })
-];
+// --- INPUT HANDLER ---
+const keys = { left: false, right: false, down: false, jumpPressed: false };
 
-// KEYBOARD INPUTS
-window.addEventListener("keydown", (e) => keys[e.code] = true);
-window.addEventListener("keyup", (e) => keys[e.code] = false);
-
-// TOUCH/MOBILE INPUTS
-function setupTouchBtn(btnId, keyCode) {
-    const btn = document.getElementById(btnId);
-    
-    const start = (e) => {
-        e.preventDefault();
-        keys[keyCode] = true;
-        btn.classList.add('pressed');
-    };
-    
-    const end = (e) => {
-        e.preventDefault();
-        keys[keyCode] = false;
-        btn.classList.remove('pressed');
-    };
-
-    btn.addEventListener('touchstart', start);
-    btn.addEventListener('touchend', end);
-    btn.addEventListener('mousedown', start);
-    btn.addEventListener('mouseup', end);
-    btn.addEventListener('mouseleave', end);
-}
-
-setupTouchBtn("leftBtn", "ArrowLeft");
-setupTouchBtn("rightBtn", "ArrowRight");
-setupTouchBtn("jumpBtn", "Space");
-
-function checkCollision(obj1, obj2) {
-    return obj1.x < obj2.x + obj2.width &&
-           obj1.x + obj1.width > obj2.x &&
-           obj1.y < obj2.y + obj2.height &&
-           obj1.y + obj1.height > obj2.y;
-}
-
-function resetPlayerPosition() {
-    player.x = 40;
-    player.y = 300;
-    player.velX = 0;
-    player.velY = 0;
-}
-
-function resetEntireGame() {
-    currentLevel = 0;                  
-    levelNumDisplay.innerText = "1";   
-    levelStartTime = Date.now();       
-    
-    for (let l = 0; l < levels.length; l++) {
-        if (levels[l].hole) levels[l].hole.activated = false;
-        for (let p = 0; p < levels[l].platforms.length; p++) {
-            let plat = levels[l].platforms[p];
-            if (plat.type === "disappearing") plat.active = true;
-            if (plat.type === "bridge") plat.active = false;
-        }
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+    if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !keys.jumpPressed) {
+        keys.jumpPressed = true;
+        handleJump();
     }
-    levels[1].boxes = [{ x: 180, y: 340, width: 40, height: 40, velX: 0, velY: 0, grounded: false }];
-    levels[3].boxes = [{ x: 250, y: 340, width: 40, height: 40, velX: 0, velY: 0, grounded: false }];
-    resetPlayerPosition();             
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+    if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.jumpPressed = false;
+});
+
+function handleJump() {
+    if (player.jumpCount < player.maxJumps) {
+        player.vy = player.jumpForce;
+        player.jumpCount++;
+        player.isGrounded = false;
+    }
 }
 
-// DRAWING HELPER FUNCTIONS
-function drawPixelPerson(x, y, width, height) {
-    let pX = width / 8;
-    let pY = height / 8;
-
-    // Head (Skin)
-    ctx.fillStyle = "#FFCC99";
-    ctx.fillRect(x + 2*pX, y, 4*pX, 3*pY);
-
-    // Eyes
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + 3*pX, y + 1*pY, 1*pX, 1*pY);
-    ctx.fillRect(x + 5*pX, y + 1*pY, 1*pX, 1*pY);
-
-    // Shirt / Body
-    ctx.fillStyle = "#3498DB";
-    ctx.fillRect(x + 1*pX, y + 3*pY, 6*pX, 3*pY);
-
-    // Legs / Pants
-    ctx.fillStyle = "#2C3E50";
-    ctx.fillRect(x + 2*pX, y + 6*pY, 1.5*pX, 2*pY);
-    ctx.fillRect(x + 4.5*pX, y + 6*pY, 1.5*pX, 2*pY);
-}
-
-function drawChocolateMilk(x, y, width, height) {
-    let pX = width / 8;
-    let pY = height / 10;
-
-    // Outer Glass Outline
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(x, y, width, height);
-
-    // Inner Glass Cutout
-    ctx.fillStyle = "#333344";
-    ctx.fillRect(x + 1*pX, y, 6*pX, height - 1*pY);
-
-    // Chocolate Milk
-    ctx.fillStyle = "#6E3B11";
-    ctx.fillRect(x + 1*pX, y + 2*pY, 6*pX, height - 3*pY);
-
-    // Straw
-    ctx.fillStyle = "#E74C3C";
-    ctx.fillRect(x + 5*pX, y - 2*pY, 1.5*pX, 5*pY);
-
-    // Glass Reflection
-    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.fillRect(x + 2*pX, y + 3*pY, 1*pX, height - 5*pY);
+// --- GAME ENGINE ---
+function loadLevel(index) {
+    if (index >= levelPool.length) {
+        document.getElementById('status-display').innerText = "YOU WIN! ALL 50 LEVELS CLEAR!";
+        return;
+    }
+    const current = levelPool[index];
+    player.x = current.playerStart.x;
+    player.y = current.playerStart.y;
+    player.vx = 0;
+    player.vy = 0;
+    player.jumpCount = 0;
+    document.getElementById('level-display').innerText = `Level: ${index + 1} / ${TOTAL_LEVELS}`;
 }
 
 function update() {
-    let activeLevelData = levels[currentLevel];
-    if (!activeLevelData) return;
+    const currentLevel = levelPool[currentLevelIndex];
+    if (!currentLevel) return;
 
-    let platforms = activeLevelData.platforms;
-    let goal = activeLevelData.goal;
-    let boxes = activeLevelData.boxes;
-    let hole = activeLevelData.hole;
+    // Movement
+    if (keys.left) player.vx = -player.speed;
+    else if (keys.right) player.vx = player.speed;
+    else player.vx = 0;
 
-    // 1. Manage Timers
-    if (Date.now() - levelStartTime > 5000) {
-        for (let i = 0; i < platforms.length; i++) {
-            if (platforms[i].type === "disappearing") platforms[i].active = false;
-        }
-    }
+    player.x += player.vx;
+    player.vy += player.gravity;
+    player.y += player.vy;
 
-    // 2. Update Moving Platforms
-    for (let plat of platforms) {
-        plat.moveX = 0;
-        plat.moveY = 0;
-
-        if (plat.type === "movingHoriz") {
-            plat.moveX = plat.speed * plat.dir;
-            plat.x += plat.moveX;
-            if (plat.x <= plat.minX) {
-                plat.x = plat.minX;
-                plat.dir = 1;
-            } else if (plat.x + plat.width >= plat.maxX) {
-                plat.x = plat.maxX - plat.width;
-                plat.dir = -1;
-            }
-        } else if (plat.type === "movingVert") {
-            plat.moveY = plat.speed * plat.dir;
-            plat.y += plat.moveY;
-            if (plat.y <= plat.minY) {
-                plat.y = plat.minY;
-                plat.dir = 1;
-            } else if (plat.y + plat.height >= plat.maxY) {
-                plat.y = plat.maxY - plat.height;
-                plat.dir = -1;
-            }
-        }
-    }
-
-    // 3. Input Management
-    if (keys["ArrowLeft"] || keys["KeyA"]) {
-        player.velX = -player.speed;
-    } else if (keys["ArrowRight"] || keys["KeyD"]) {
-        player.velX = player.speed;
-    } else {
-        player.velX = 0;
-    }
-
-    if ((keys["Space"] || keys["ArrowUp"] || keys["KeyW"]) && player.grounded) {
-        player.velY = -player.jumpForce;
-        player.grounded = false;
-    }
-
-    // 4. Movement
-    player.velY += gravity;
-    player.x += player.velX;
-    player.y += player.velY;
-
+    // Screen bounds
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    if (player.y > canvas.height) loadLevel(currentLevelIndex); // Respawn on fall
 
-    // 5. Box Updates
-    if (boxes && boxes.length > 0) {
-        for (let box of boxes) {
-            box.velY += gravity; 
-            box.x += box.velX;
-            box.y += box.velY;
-            box.velX *= 0.8; 
+    player.isGrounded = false;
 
-            if (checkCollision(player, box)) {
-                let overlapX = Math.min(player.x + player.width, box.x + box.width) - Math.max(player.x, box.x);
-                let overlapY = Math.min(player.y + player.height, box.y + box.height) - Math.max(player.y, box.y);
+    // Platform Collisions
+    currentLevel.platforms.forEach(plat => {
+        let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
-                if (overlapX > overlapY) {
-                    if (player.velY > 0 && player.y < box.y) { 
-                        player.y -= overlapY;
-                        player.velY = 0;
-                        player.grounded = true;
-                    } else if (player.velY < 0 && player.y > box.y) {
-                        player.y += overlapY;
-                        player.velY = 0;
-                    }
-                } else { 
-                    if (player.x < box.x) {
-                        box.velX = player.speed * 0.5; 
-                        player.x -= overlapX;
-                    } else {
-                        box.velX = -player.speed * 0.5; 
-                        player.x += overlapX;
-                    }
+        if (inXRange) {
+            // Set jump limit dynamically based on platform type
+            if (plat.stacked) {
+                player.maxJumps = 2; // Enable double-jump for stacked platforms
+            }
+
+            let feetPrev = player.y + player.height - player.vy;
+            
+            // Landing on top
+            if (player.vy >= 0 && feetPrev <= plat.y + 10 && (player.y + player.height >= plat.y)) {
+                if (keys.down && plat.stacked) {
+                    player.y += 6; // Drop down through stacked platform
+                } else {
+                    player.y = plat.y - player.height;
+                    player.vy = 0;
+                    player.isGrounded = true;
+                    player.jumpCount = 0;
+                    player.maxJumps = plat.stacked ? 2 : 1;
                 }
             }
 
-            for (let plat of platforms) {
-                if (plat.type === "bridge" && !plat.active) continue; 
-                if (checkCollision(box, plat)) {
-                    let overlapX = Math.min(box.x + box.width, plat.x + plat.width) - Math.max(box.x, plat.x);
-                    let overlapY = Math.min(box.y + box.height, plat.y + plat.height) - Math.max(box.y, plat.y);
-                    if (overlapX > overlapY) {
-                        if (box.velY > 0 && box.y < plat.y) {
-                            box.y -= overlapY;
-                            box.velY = 0;
-                            if (plat.moveX) box.x += plat.moveX;
-                            if (plat.moveY) box.y += plat.moveY;
-                        }
-                    } else {
-                        if (box.x < plat.x) box.x -= overlapX;
-                        else box.x += overlapX;
-                    }
-                }
-            }
-
-            if (hole && checkCollision(box, hole) && !hole.activated) {
-                hole.activated = true;
-                for (let plat of platforms) {
-                    if (plat.type === "bridge") plat.active = true;
+            // Upward collision through stacked platforms
+            if (player.vy < 0 && player.y <= plat.y + plat.height && player.y >= plat.y) {
+                if (plat.stacked && player.jumpCount < 2) {
+                    // Allow pass-through on first jump phase
+                } else if (plat.stacked && player.jumpCount >= 2) {
+                    player.vy = 1; // Block on second jump phase
                 }
             }
         }
-    }
+    });
 
-    // 6. Player Collisions & Platform Riding
-    player.grounded = false;
-    for (let plat of platforms) {
-        if (plat.type === "disappearing" && !plat.active) continue;
-        if (plat.type === "bridge" && !plat.active) continue;
-
-        if (checkCollision(player, plat)) {
-            let overlapX = Math.min(player.x + player.width, plat.x + plat.width) - Math.max(player.x, plat.x);
-            let overlapY = Math.min(player.y + player.height, plat.y + plat.height) - Math.max(player.y, plat.y);
-
-            if (overlapX > overlapY) {
-                if (player.velY >= 0 && player.y < plat.y) {
-                    player.y -= overlapY;
-                    player.velY = 0;
-                    player.grounded = true;
-
-                    if (plat.moveX) player.x += plat.moveX;
-                    if (plat.moveY) player.y += plat.moveY;
-                } else if (player.velY < 0 && player.y > plat.y) {
-                    player.y += overlapY;
-                    player.velY = 0;
-                }
-            } else {
-                if (player.x < plat.x) player.x -= overlapX;
-                else player.x += overlapX;
-            }
-        }
-    }
-
-    // Fall Off Screen Reset
-    if (player.y > canvas.height) {
-        resetPlayerPosition();
-    }
-
-    // 7. Goal Collision & Level Transition
-    if (goal && checkCollision(player, goal)) {
-        currentLevel++;
-        if (currentLevel >= levels.length) {
-            alert("Congratulations! You completed all 17 levels!");
-            resetEntireGame();
+    // Check Goal (Chocolate Milk) Collision
+    const milk = currentLevel.milk;
+    if (
+        player.x < milk.x + 30 &&
+        player.x + player.width > milk.x &&
+        player.y < milk.y + 40 &&
+        player.y + player.height > milk.y
+    ) {
+        currentLevelIndex++;
+        if (currentLevelIndex < levelPool.length) {
+            loadLevel(currentLevelIndex);
         } else {
-            levelNumDisplay.innerText = currentLevel + 1;
-            levelStartTime = Date.now();
-            resetPlayerPosition();
+            document.getElementById('status-display').innerText = "YOU WIN! ALL 50 LEVELS CLEAR!";
         }
     }
 }
 
-function draw() {
+// --- RENDER ---
+function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    let activeLevelData = levels[currentLevel];
-    if (!activeLevelData) return;
-
-    let platforms = activeLevelData.platforms;
-    let goal = activeLevelData.goal;
-    let boxes = activeLevelData.boxes;
-    let hole = activeLevelData.hole;
-
-    // Draw Hole/Pit
-    if (hole) {
-        ctx.fillStyle = hole.activated ? "#22aa22" : "#111";
-        ctx.fillRect(hole.x, hole.y, hole.width, hole.height);
-    }
+    const currentLevel = levelPool[currentLevelIndex];
+    if (!currentLevel) return;
 
     // Draw Platforms
-    for (let plat of platforms) {
-        if (plat.type === "disappearing") {
-            if (!plat.active) continue;
-            ctx.fillStyle = "#E67E22";
-        } else if (plat.type === "bridge") {
-            if (!plat.active) continue;
-            ctx.fillStyle = "#2ECC71";
-        } else if (plat.type === "movingHoriz" || plat.type === "movingVert") {
-            ctx.fillStyle = "#9B59B6";
+    currentLevel.platforms.forEach(plat => {
+        if (plat.stacked) {
+            // Stacked Platform (Double-Layer Visual)
+            ctx.fillStyle = '#8b5a2b';
+            ctx.fillRect(plat.x, plat.y, plat.width, plat.height / 2);
+            ctx.fillStyle = '#5c3a1d';
+            ctx.fillRect(plat.x, plat.y + (plat.height / 2), plat.width, plat.height / 2);
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
         } else {
-            ctx.fillStyle = "#ECF0F1";
+            // Regular Single Platform
+            ctx.fillStyle = '#27ae60';
+            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
         }
-        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-    }
+    });
 
-    // Draw Boxes
-    if (boxes) {
-        ctx.fillStyle = "#E74C3C";
-        for (let box of boxes) {
-            ctx.fillRect(box.x, box.y, box.width, box.height);
-        }
-    }
+    // Draw Chocolate Milk Goal
+    const milk = currentLevel.milk;
+    ctx.fillStyle = '#795548'; // Milk body
+    ctx.fillRect(milk.x, milk.y + 10, 30, 30);
+    ctx.fillStyle = '#d7ccc8'; // Top peak
+    ctx.beginPath();
+    ctx.moveTo(milk.x, milk.y + 10);
+    ctx.lineTo(milk.x + 15, milk.y);
+    ctx.lineTo(milk.x + 30, milk.y + 10);
+    ctx.fill();
 
-    // Draw Goal (Glass of Chocolate Milk)
-    if (goal) {
-        drawChocolateMilk(goal.x, goal.y, goal.width, goal.height);
-    }
-
-    // Draw Player (Pixel Person)
-    drawPixelPerson(player.x, player.y, player.width, player.height);
+    // Draw Player
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
 }
 
+// --- MAIN LOOP ---
 function gameLoop() {
     update();
-    draw();
+    render();
     requestAnimationFrame(gameLoop);
 }
 
+// Start Game
+initializeLevels();
+loadLevel(0);
 gameLoop();
-</script>
-    <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
 </script>
 </body>
 </html>

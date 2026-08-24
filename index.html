@@ -25,7 +25,7 @@
             overflow: hidden;
         }
         canvas {
-            background: linear-gradient(to bottom, #2b1055, #7597de);
+            background: linear-gradient(to bottom, #1e1b4b, #312e81, #4338ca);
             display: block;
         }
         #ui {
@@ -58,7 +58,7 @@
     <canvas id="gameCanvas" width="800" height="500"></canvas>
 </div>
 <div class="controls-hint">
-    <b>Controls:</b> A/D or Arrow Keys to Move | SPACE / W to Jump (Double-Tap on Stacked) | DOWN / S to Drop Down
+    <b>Controls:</b> A/D or Arrows to Move | SPACE / W / UP to Double Jump | DOWN / S to Drop Through Stacked Platforms
 </div>
 
 <script>
@@ -70,27 +70,25 @@ let currentLevelIndex = 0;
 let levelPool = [];
 const TOTAL_LEVELS = 50;
 
-// --- GUARANTEED BEATABLE PROCEDURAL LEVEL GENERATOR ---
+// --- GUARANTEED BEATABLE PROCEDURAL GENERATOR ---
 function generateBeatableLevel() {
     let platforms = [];
     
-    // 1. Starting Platform
-    let startPlat = { x: 20, y: 420, width: 140, height: 20, stacked: false };
+    // Starting Platform
+    let startPlat = { x: 20, y: 420, width: 140, height: 22, stacked: false };
     platforms.push(startPlat);
 
     let currentX = startPlat.x;
     let currentY = startPlat.y;
 
-    // Chain 6 to 9 reachable platforms
-    let targetPlatformCount = Math.floor(Math.random() * 4) + 6; 
+    let targetPlatformCount = Math.floor(Math.random() * 3) + 6; 
 
     for (let i = 0; i < targetPlatformCount; i++) {
-        let isStacked = Math.random() < 0.35; // 35% chance for stacked platform
+        let isStacked = Math.random() < 0.35; // 35% chance for double-stacked platform
 
-        // Max jump constraints matching player physics
-        let maxVerticalUp = isStacked ? 120 : 75;
-        let maxVerticalDown = 90;
-        let maxHorizontalGap = isStacked ? 150 : 130;
+        let maxVerticalUp = isStacked ? 130 : 110;
+        let maxVerticalDown = 100;
+        let maxHorizontalGap = isStacked ? 160 : 140;
 
         let minX = currentX + 85; 
         let maxX = currentX + maxHorizontalGap;
@@ -108,7 +106,7 @@ function generateBeatableLevel() {
             x: nextX,
             y: nextY,
             width: platWidth,
-            height: 20,
+            height: 22,
             stacked: isStacked
         });
 
@@ -116,11 +114,11 @@ function generateBeatableLevel() {
         currentY = nextY;
     }
 
-    // 2. Goal Platform + Chocolate Milk
+    // Goal Platform + Chocolate Milk
     let lastPlat = platforms[platforms.length - 1];
     let milkPosition = {
         x: lastPlat.x + (lastPlat.width / 2) - 15,
-        y: lastPlat.y - 40
+        y: lastPlat.y - 42
     };
 
     return {
@@ -145,20 +143,28 @@ const player = {
     height: 36,
     vx: 0,
     vy: 0,
-    speed: 4.5,
+    speed: 4.8,
     gravity: 0.5,
-    jumpForce: -9.5,
+    jumpForce: -9.8,
     isGrounded: false,
     jumpCount: 0,
-    maxJumps: 1
+    maxJumps: 2, // Universal Double Jump
+    facing: 'right',
+    animFrame: 0
 };
 
 // --- INPUT HANDLER ---
 const keys = { left: false, right: false, down: false, jumpPressed: false };
 
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
-    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        keys.left = true;
+        player.facing = 'left';
+    }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        keys.right = true;
+        player.facing = 'right';
+    }
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
     if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !keys.jumpPressed) {
         keys.jumpPressed = true;
@@ -181,7 +187,7 @@ function handleJump() {
     }
 }
 
-// --- GAME ENGINE ---
+// --- GAME LOGIC ---
 function loadLevel(index) {
     if (index >= levelPool.length) {
         document.getElementById('status-display').innerText = "YOU WIN! ALL 50 LEVELS CLEAR!";
@@ -200,16 +206,23 @@ function update() {
     const currentLevel = levelPool[currentLevelIndex];
     if (!currentLevel) return;
 
-    // Movement
-    if (keys.left) player.vx = -player.speed;
-    else if (keys.right) player.vx = player.speed;
-    else player.vx = 0;
+    // Movement & Animation Frame Counter
+    if (keys.left) {
+        player.vx = -player.speed;
+        player.animFrame += 0.2;
+    } else if (keys.right) {
+        player.vx = player.speed;
+        player.animFrame += 0.2;
+    } else {
+        player.vx = 0;
+        player.animFrame = 0;
+    }
 
     player.x += player.vx;
     player.vy += player.gravity;
     player.y += player.vy;
 
-    // Screen bounds
+    // Screen Boundary
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     if (player.y > canvas.height) loadLevel(currentLevelIndex); // Respawn on fall
@@ -221,14 +234,9 @@ function update() {
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
         if (inXRange) {
-            // Set jump limit dynamically based on platform type
-            if (plat.stacked) {
-                player.maxJumps = 2; // Enable double-jump for stacked platforms
-            }
-
             let feetPrev = player.y + player.height - player.vy;
             
-            // Landing on top
+            // Landing on Top
             if (player.vy >= 0 && feetPrev <= plat.y + 10 && (player.y + player.height >= plat.y)) {
                 if (keys.down && plat.stacked) {
                     player.y += 6; // Drop down through stacked platform
@@ -236,23 +244,22 @@ function update() {
                     player.y = plat.y - player.height;
                     player.vy = 0;
                     player.isGrounded = true;
-                    player.jumpCount = 0;
-                    player.maxJumps = plat.stacked ? 2 : 1;
+                    player.jumpCount = 0; // Reset jumps upon landing
                 }
             }
 
-            // Upward collision through stacked platforms
+            // Upward Pass-Through on Stacked Platforms
             if (player.vy < 0 && player.y <= plat.y + plat.height && player.y >= plat.y) {
                 if (plat.stacked && player.jumpCount < 2) {
-                    // Allow pass-through on first jump phase
+                    // Pass upward on 1st jump phase
                 } else if (plat.stacked && player.jumpCount >= 2) {
-                    player.vy = 1; // Block on second jump phase
+                    player.vy = 1; // Solid barrier on 2nd jump phase
                 }
             }
         }
     });
 
-    // Check Goal (Chocolate Milk) Collision
+    // Goal (Chocolate Milk) Collision
     const milk = currentLevel.milk;
     if (
         player.x < milk.x + 30 &&
@@ -269,47 +276,113 @@ function update() {
     }
 }
 
-// --- RENDER ---
+// --- DETAILED GRAPHICS RENDER ENGINE ---
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const currentLevel = levelPool[currentLevelIndex];
     if (!currentLevel) return;
 
-    // Draw Platforms
+    // 1. Draw Platforms with Grass Tops & Shadows
     currentLevel.platforms.forEach(plat => {
         if (plat.stacked) {
-            // Stacked Platform (Double-Layer Visual)
-            ctx.fillStyle = '#8b5a2b';
+            // Stacked Platform (Double Brick Layer with Gold Trim)
+            ctx.fillStyle = '#6d4c41';
             ctx.fillRect(plat.x, plat.y, plat.width, plat.height / 2);
-            ctx.fillStyle = '#5c3a1d';
+            ctx.fillStyle = '#4e342e';
             ctx.fillRect(plat.x, plat.y + (plat.height / 2), plat.width, plat.height / 2);
-            ctx.strokeStyle = '#f39c12';
+
+            // Gold Highlight Frame
+            ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
             ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
+
+            // Layer Divider Line
+            ctx.strokeStyle = '#d97706';
+            ctx.beginPath();
+            ctx.moveTo(plat.x, plat.y + plat.height / 2);
+            ctx.lineTo(plat.x + plat.width, plat.y + plat.height / 2);
+            ctx.stroke();
         } else {
-            // Regular Single Platform
-            ctx.fillStyle = '#27ae60';
+            // Standard Grass Platform
+            ctx.fillStyle = '#4b5563'; // Stone Base
             ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+            ctx.fillStyle = '#10b981'; // Green Grass Top
+            ctx.fillRect(plat.x, plat.y, plat.width, 5);
         }
+
+        // Platform Drop Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(plat.x, plat.y + plat.height, plat.width, 4);
     });
 
-    // Draw Chocolate Milk Goal
+    // 2. Draw Detailed Chocolate Milk Goal
     const milk = currentLevel.milk;
-    ctx.fillStyle = '#795548'; // Milk body
-    ctx.fillRect(milk.x, milk.y + 10, 30, 30);
-    ctx.fillStyle = '#d7ccc8'; // Top peak
+    
+    // Straw
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(milk.x, milk.y + 10);
-    ctx.lineTo(milk.x + 15, milk.y);
-    ctx.lineTo(milk.x + 30, milk.y + 10);
+    ctx.moveTo(milk.x + 18, milk.y + 8);
+    ctx.lineTo(milk.x + 24, milk.y - 4);
+    ctx.lineTo(milk.x + 28, milk.y - 2);
+    ctx.stroke();
+
+    // Milk Carton Body
+    ctx.fillStyle = '#78350f'; // Chocolate Brown
+    ctx.fillRect(milk.x, milk.y + 12, 30, 28);
+
+    // Top Gable Peak
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(milk.x, milk.y + 12);
+    ctx.lineTo(milk.x + 15, milk.y + 2);
+    ctx.lineTo(milk.x + 30, milk.y + 12);
     ctx.fill();
 
-    // Draw Player
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+    // "MILK" Text Label
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '9px Arial';
+    ctx.fontWeight = 'bold';
+    ctx.fillText('MILK', milk.x + 3, milk.y + 28);
+
+    // 3. Draw Character with Eyes, Direction Facing & Walking Legs
+    // Body Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillRect(player.x + 2, player.y + player.height - 2, player.width - 4, 4);
+
+    // Main Body
+    ctx.fillStyle = '#ef4444'; // Red Character Block
+    ctx.fillRect(player.x, player.y, player.width, player.height - 6);
+
+    // Eyes (Facing direction)
+    ctx.fillStyle = '#ffffff';
+    let eyeOffset = player.facing === 'right' ? 14 : 4;
+    ctx.fillRect(player.x + eyeOffset, player.y + 8, 5, 7);
+    ctx.fillRect(player.x + eyeOffset + 6, player.y + 8, 5, 7);
+
+    // Pupils
+    ctx.fillStyle = '#000000';
+    let pupilOffset = player.facing === 'right' ? 2 : 0;
+    ctx.fillRect(player.x + eyeOffset + pupilOffset + 1, player.y + 10, 2, 3);
+    ctx.fillRect(player.x + eyeOffset + 6 + pupilOffset + 1, player.y + 10, 2, 3);
+
+    // Animated Walking Legs
+    ctx.fillStyle = '#b91c1c';
+    let legCycle = Math.sin(player.animFrame) * 4;
+    if (player.isGrounded && player.vx !== 0) {
+        // Left Leg
+        ctx.fillRect(player.x + 4, player.y + player.height - 6, 8, 6 + legCycle);
+        // Right Leg
+        ctx.fillRect(player.x + 16, player.y + player.height - 6, 8, 6 - legCycle);
+    } else {
+        // Standing / Jumping Legs
+        ctx.fillRect(player.x + 4, player.y + player.height - 6, 8, 6);
+        ctx.fillRect(player.x + 16, player.y + player.height - 6, 8, 6);
+    }
 }
 
-// --- MAIN LOOP ---
+// --- MAIN ENGINE LOOP ---
 function gameLoop() {
     update();
     render();

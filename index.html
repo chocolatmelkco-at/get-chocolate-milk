@@ -338,9 +338,9 @@ function generateBeatableLevel() {
     for (let i = 0; i < targetPlatformCount; i++) {
         let randTypeRoll = Math.random();
         let platType = 'normal';
-        if (randTypeRoll < 0.25) platType = 'disappearing';
-        else if (randTypeRoll < 0.50) platType = 'horizontal';
-        else if (randTypeRoll < 0.70) platType = 'vertical';
+        if (randTypeRoll < 0.30) platType = 'disappearing';
+        else if (randTypeRoll < 0.60) platType = 'horizontal';
+        else if (randTypeRoll < 0.80) platType = 'vertical';
 
         let maxVerticalUp = 110;
         let maxVerticalDown = 90;
@@ -368,8 +368,7 @@ function generateBeatableLevel() {
             type: platType,
             active: true,
             moveTimer: Math.random() * 100,
-            permanentlyGone: false,
-            spawnTime: Date.now() // Track spawn time for 10-second lifespan
+            steppedOnTime: null // Tracks when the player steps on yellow platforms
         };
 
         platforms.push(plat);
@@ -386,8 +385,7 @@ function generateBeatableLevel() {
     return {
         playerStart: { x: startPlat.x + 30, y: startPlat.y - 40 },
         milk: milkPosition,
-        platforms: platforms,
-        levelStartTime: null
+        platforms: platforms
     };
 }
 
@@ -583,13 +581,10 @@ function loadLevel(index) {
     player.vy = 0;
     player.jumpCount = 0;
 
-    // Reset platform status and timer for the current level
-    const now = Date.now();
-    current.levelStartTime = now;
+    // Reset platform status
     current.platforms.forEach(plat => {
         plat.active = true;
-        plat.permanentlyGone = false;
-        plat.spawnTime = now;
+        plat.steppedOnTime = null;
     });
 
     document.getElementById('level-display').innerText = `Level: ${index + 1} / ${TOTAL_LEVELS}`;
@@ -619,6 +614,8 @@ function update() {
 
     player.isGrounded = false;
 
+    // Update platform movements and timed disappearances
+    const now = Date.now();
     currentLevel.platforms.forEach(plat => {
         if (plat.type === 'horizontal') {
             plat.moveTimer += 0.03;
@@ -627,17 +624,17 @@ function update() {
             plat.moveTimer += 0.03;
             plat.y = plat.startY + Math.sin(plat.moveTimer) * 40;
         }
+
+        // Disappear exactly 1 second (1000ms) after being stepped on
+        if (plat.type === 'disappearing' && plat.steppedOnTime !== null) {
+            if (now - plat.steppedOnTime >= 1000) {
+                plat.active = false;
+            }
+        }
     });
 
     currentLevel.platforms.forEach(plat => {
-        if (!plat.active || plat.permanentlyGone) return;
-
-        // Disappear permanently after 10 seconds (10,000 ms) from level start
-        if (plat.type === 'disappearing' && Date.now() - plat.spawnTime >= 10000) {
-            plat.active = false;
-            plat.permanentlyGone = true;
-            return;
-        }
+        if (!plat.active) return;
 
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
@@ -652,6 +649,11 @@ function update() {
                     player.vy = 0;
                     player.isGrounded = true;
                     player.jumpCount = 0;
+
+                    // Trigger 1-second timer when stepped on
+                    if (plat.type === 'disappearing' && plat.steppedOnTime === null) {
+                        plat.steppedOnTime = Date.now();
+                    }
                 }
             }
         }
@@ -682,10 +684,18 @@ function render() {
     if (!currentLevel) return;
 
     currentLevel.platforms.forEach(plat => {
-        if (!plat.active || plat.permanentlyGone) return;
+        if (!plat.active) return;
 
         let color = '#ffffff'; 
-        if (plat.type === 'disappearing') color = '#f1c40f'; 
+        if (plat.type === 'disappearing') {
+            // Flash or fade slightly if stepped on
+            if (plat.steppedOnTime !== null) {
+                let timeElapsed = Date.now() - plat.steppedOnTime;
+                color = timeElapsed % 100 < 50 ? '#f1c40f' : '#e67e22'; // Flashes yellow/orange before vanishing
+            } else {
+                color = '#f1c40f';
+            }
+        } 
         else if (plat.type === 'horizontal') color = '#9b59b6'; 
         else if (plat.type === 'vertical') color = '#2ecc71'; 
 

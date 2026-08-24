@@ -8,9 +8,9 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #1a1a24;
+            background-color: #1e1e1e;
             color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -20,13 +20,16 @@
         }
         #game-container {
             position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            border: 4px solid #555555;
+            border-radius: 4px;
             overflow: hidden;
         }
         canvas {
-            background: linear-gradient(to bottom, #2b1055, #7597de);
+            background-color: #2b2b2b; /* Blank grey background */
             display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
         #ui {
             position: absolute;
@@ -35,15 +38,15 @@
             right: 10px;
             display: flex;
             justify-content: space-between;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            text-shadow: 2px 2px 0px #000;
             pointer-events: none;
         }
         .controls-hint {
             margin-top: 15px;
-            color: #a0a0c0;
-            font-size: 14px;
+            color: #aaaaaa;
+            font-size: 13px;
             text-align: center;
         }
     </style>
@@ -58,7 +61,7 @@
     <canvas id="gameCanvas" width="800" height="500"></canvas>
 </div>
 <div class="controls-hint">
-    <b>Controls:</b> A/D or Arrow Keys to Move | SPACE / W to Double Jump | DOWN / S to Drop Down Stacked Platforms
+    <b>Controls:</b> A/D or Arrows to Move | SPACE / W / UP to Double Jump | DOWN / S to Drop Through Platforms
 </div>
 
 <script>
@@ -70,25 +73,36 @@ let currentLevelIndex = 0;
 let levelPool = [];
 const TOTAL_LEVELS = 50;
 
-// --- GUARANTEED BEATABLE PROCEDURAL GENERATOR ---
+// --- PROCEDURAL LEVEL GENERATOR WITH SPECIAL PLATFORM TYPES ---
 function generateBeatableLevel() {
     let platforms = [];
     
-    // Starting Platform
-    let startPlat = { x: 20, y: 420, width: 140, height: 20, stacked: false };
+    // Starting Platform (Always Normal White)
+    let startPlat = { 
+        x: 20, 
+        y: 420, 
+        width: 140, 
+        height: 20, 
+        type: 'normal', // white
+        active: true 
+    };
     platforms.push(startPlat);
 
     let currentX = startPlat.x;
     let currentY = startPlat.y;
 
-    let targetPlatformCount = Math.floor(Math.random() * 4) + 6; 
+    let targetPlatformCount = Math.floor(Math.random() * 3) + 6; 
 
     for (let i = 0; i < targetPlatformCount; i++) {
-        let isStacked = Math.random() < 0.35; // 35% chance for stacked platform
+        let randTypeRoll = Math.random();
+        let platType = 'normal'; // default white
+        if (randTypeRoll < 0.25) platType = 'disappearing'; // yellow
+        else if (randTypeRoll < 0.50) platType = 'horizontal'; // purple
+        else if (randTypeRoll < 0.70) platType = 'vertical'; // green
 
-        let maxVerticalUp = isStacked ? 120 : 90;
+        let maxVerticalUp = 110;
         let maxVerticalDown = 90;
-        let maxHorizontalGap = isStacked ? 150 : 135;
+        let maxHorizontalGap = 135;
 
         let minX = currentX + 85; 
         let maxX = currentX + maxHorizontalGap;
@@ -98,27 +112,34 @@ function generateBeatableLevel() {
         let maxY = Math.min(430, currentY + maxVerticalDown);
         let nextY = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
 
-        if (nextX + 90 > 770) break; // Keep inside canvas boundary
+        if (nextX + 90 > 770) break;
 
-        let platWidth = Math.floor(Math.random() * 40) + 90;
+        let platWidth = Math.floor(Math.random() * 40) + 80;
 
-        platforms.push({
+        let plat = {
             x: nextX,
             y: nextY,
+            startX: nextX,
+            startY: nextY,
             width: platWidth,
-            height: 20,
-            stacked: isStacked
-        });
+            height: 18,
+            type: platType,
+            active: true,
+            moveDir: 1,
+            moveTimer: Math.random() * 100,
+            disappearTimer: 0
+        };
 
+        platforms.push(plat);
         currentX = nextX;
         currentY = nextY;
     }
 
-    // Goal Platform + Chocolate Milk
+    // Goal Position (Pixelated Glass of Chocolate Milk)
     let lastPlat = platforms[platforms.length - 1];
     let milkPosition = {
-        x: lastPlat.x + (lastPlat.width / 2) - 15,
-        y: lastPlat.y - 40
+        x: lastPlat.x + (lastPlat.width / 2) - 12,
+        y: lastPlat.y - 36
     };
 
     return {
@@ -139,8 +160,8 @@ function initializeLevels() {
 const player = {
     x: 50,
     y: 350,
-    width: 28,
-    height: 36,
+    width: 24,
+    height: 32,
     vx: 0,
     vy: 0,
     speed: 4.5,
@@ -148,15 +169,22 @@ const player = {
     jumpForce: -9.5,
     isGrounded: false,
     jumpCount: 0,
-    maxJumps: 2 // Universal Double Jump
+    maxJumps: 2, // Universal Double Jump
+    facing: 'right'
 };
 
 // --- INPUT HANDLER ---
 const keys = { left: false, right: false, down: false, jumpPressed: false };
 
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
-    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        keys.left = true;
+        player.facing = 'left';
+    }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        keys.right = true;
+        player.facing = 'right';
+    }
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
     if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !keys.jumpPressed) {
         keys.jumpPressed = true;
@@ -207,15 +235,36 @@ function update() {
     player.vy += player.gravity;
     player.y += player.vy;
 
-    // Screen bounds
+    // Screen Boundary
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     if (player.y > canvas.height) loadLevel(currentLevelIndex); // Respawn on fall
 
     player.isGrounded = false;
 
+    // Update Platforms (Movement & Disappearing timers)
+    currentLevel.platforms.forEach(plat => {
+        if (plat.type === 'horizontal') {
+            plat.moveTimer += 0.03;
+            plat.x = plat.startX + Math.sin(plat.moveTimer) * 55;
+        } else if (plat.type === 'vertical') {
+            plat.moveTimer += 0.03;
+            plat.y = plat.startY + Math.sin(plat.moveTimer) * 40;
+        }
+
+        if (!plat.active) {
+            plat.disappearTimer++;
+            if (plat.disappearTimer > 90) { // Reappear after 1.5 seconds
+                plat.active = true;
+                plat.disappearTimer = 0;
+            }
+        }
+    });
+
     // Platform Collisions
     currentLevel.platforms.forEach(plat => {
+        if (!plat.active) return;
+
         let inXRange = (player.x + player.width > plat.x) && (player.x < plat.x + plat.width);
 
         if (inXRange) {
@@ -223,33 +272,30 @@ function update() {
             
             // Landing on top
             if (player.vy >= 0 && feetPrev <= plat.y + 10 && (player.y + player.height >= plat.y)) {
-                if (keys.down && plat.stacked) {
-                    player.y += 6; // Drop down through stacked platform
+                if (keys.down) {
+                    player.y += 6; // Drop down
                 } else {
                     player.y = plat.y - player.height;
                     player.vy = 0;
                     player.isGrounded = true;
-                    player.jumpCount = 0; // Reset double-jump counter on landing
-                }
-            }
+                    player.jumpCount = 0;
 
-            // Upward collision through stacked platforms
-            if (player.vy < 0 && player.y <= plat.y + plat.height && player.y >= plat.y) {
-                if (plat.stacked && player.jumpCount < 2) {
-                    // Pass through on first jump phase
-                } else if (plat.stacked && player.jumpCount >= 2) {
-                    player.vy = 1; // Solid roof barrier on 2nd jump phase
+                    // If Yellow Disappearing Platform, trigger vanish countdown
+                    if (plat.type === 'disappearing') {
+                        plat.active = false;
+                        plat.disappearTimer = 0;
+                    }
                 }
             }
         }
     });
 
-    // Check Goal (Chocolate Milk) Collision
+    // Check Goal (Chocolate Milk Glass) Collision
     const milk = currentLevel.milk;
     if (
-        player.x < milk.x + 30 &&
+        player.x < milk.x + 24 &&
         player.x + player.width > milk.x &&
-        player.y < milk.y + 40 &&
+        player.y < milk.y + 32 &&
         player.y + player.height > milk.y
     ) {
         currentLevelIndex++;
@@ -261,44 +307,90 @@ function update() {
     }
 }
 
-// --- VERSION 2 CLEAN GRAPHICS RENDER ENGINE ---
+// --- RENDER ENGINE WITH PIXEL ART & SOLID COLOR PLATFORMS ---
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const currentLevel = levelPool[currentLevelIndex];
     if (!currentLevel) return;
 
-    // Draw Platforms
+    // 1. Draw Platforms
     currentLevel.platforms.forEach(plat => {
-        if (plat.stacked) {
-            // Stacked Platform (Double-Layer Visual from Version 2)
-            ctx.fillStyle = '#8b5a2b';
-            ctx.fillRect(plat.x, plat.y, plat.width, plat.height / 2);
-            ctx.fillStyle = '#5c3a1d';
-            ctx.fillRect(plat.x, plat.y + (plat.height / 2), plat.width, plat.height / 2);
-            ctx.strokeStyle = '#f39c12';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
-        } else {
-            // Regular Single Platform (Solid Green)
-            ctx.fillStyle = '#27ae60';
-            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-        }
+        if (!plat.active) return;
+
+        let color = '#ffffff'; // Default White (Normal)
+        if (plat.type === 'disappearing') color = '#f1c40f'; // Yellow
+        else if (plat.type === 'horizontal') color = '#9b59b6'; // Purple
+        else if (plat.type === 'vertical') color = '#2ecc71'; // Green
+
+        ctx.fillStyle = color;
+        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+        // Pixel border effect
+        ctx.strokeStyle = '#111111';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
     });
 
-    // Draw Chocolate Milk Goal (Simple Carton Visual from Version 2)
+    // 2. Draw Pixelated Glass of Chocolate Milk
     const milk = currentLevel.milk;
-    ctx.fillStyle = '#795548'; // Milk body
-    ctx.fillRect(milk.x, milk.y + 10, 30, 30);
-    ctx.fillStyle = '#d7ccc8'; // Top peak
-    ctx.beginPath();
-    ctx.moveTo(milk.x, milk.y + 10);
-    ctx.lineTo(milk.x + 15, milk.y);
-    ctx.lineTo(milk.x + 30, milk.y + 10);
-    ctx.fill();
+    const px = Math.floor(milk.x);
+    const py = Math.floor(milk.y);
 
-    // Draw Player (Clean Red Block from Version 2)
+    // Straw (Red/White pixel blocks)
     ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.fillRect(px + 14, py + 2, 4, 12);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px + 14, py + 6, 4, 3);
+
+    // Glass Outline & Body
+    ctx.fillStyle = '#ffffff'; // Glass rim/highlights
+    ctx.fillRect(px + 4, py + 12, 16, 2);
+    
+    // Glass Walls
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(px + 4, py + 14, 3, 18);
+    ctx.fillRect(px + 17, py + 14, 3, 18);
+    
+    // Base of Glass
+    ctx.fillRect(px + 6, py + 30, 12, 3);
+
+    // Chocolate Milk Liquid inside
+    ctx.fillStyle = '#5c3a21'; // Rich chocolate brown
+    ctx.fillRect(px + 7, py + 16, 10, 14);
+
+    // 3. Draw Pixelated Person Character
+    const cx = Math.floor(player.x);
+    const cy = Math.floor(player.y);
+
+    // Hair / Hat (Dark Blue / Black pixel blocks)
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(cx + 4, cy, 16, 6);
+
+    // Face / Head
+    ctx.fillStyle = '#f5cd79';
+    ctx.fillRect(cx + 4, cy + 6, 16, 8);
+
+    // Eyes (Facing direction)
+    ctx.fillStyle = '#000000';
+    let eyeOffset = player.facing === 'right' ? 12 : 6;
+    ctx.fillRect(cx + eyeOffset, cy + 8, 3, 3);
+
+    // Shirt / Torso (Bright Blue)
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(cx + 2, cy + 14, 20, 10);
+
+    // Arms
+    ctx.fillStyle = '#2980b9';
+    if (player.facing === 'right') {
+        ctx.fillRect(cx + 20, cy + 15, 3, 7);
+    } else {
+        ctx.fillRect(cx + 1, cy + 15, 3, 7);
+    }
+
+    // Legs / Pants (Dark Grey pixel blocks)
+    ctx.fillStyle = '#34495e';
+    ctx.fillRect(cx + 5, cy + 24, 5, 8);
+    ctx.fillRect(cx + 14, cy + 24, 5, 8);
 }
 
 // --- MAIN LOOP ---
